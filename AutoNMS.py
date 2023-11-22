@@ -1,6 +1,8 @@
 from netmiko import ConnectHandler
 from datetime import datetime
-import re, csv, os, json, threading, signal, sys, logging, socket
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import re, csv, os, json, threading, signal, sys, logging, socket, docx
 
 class AutoNMS:
     def __init__(self):
@@ -430,7 +432,6 @@ class AutoNMS:
                 print(f"Error en la conexión a {device['ip']}: {e}")
         
     def verifyFA(self):
-        contin = True
         for device in self.devices:
             try:
                 # Obtener el hostname del dispositivo
@@ -462,10 +463,60 @@ class AutoNMS:
             except Exception as e:
                 print(f"Error en la conexión a {device['ip']}: {e}")
 
+    def generateReport(self, output_file):
+        try:
+            # Crear un documento de Word
+            doc = docx.Document()
+
+            # Título del informe
+            doc.add_heading('Informe de Red', 0)
+
+            # Fecha del informe
+            fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            doc.add_paragraph(f"Fecha del Informe: {fecha}")
+
+            # Recopilar información de los dispositivos
+            for device in self.devices:
+                try:
+                    # Obtener el hostname del dispositivo
+                    hostname = self.get_hostname(device)
+
+                    with ConnectHandler(**device) as conn:
+                        # Obtener la configuración del dispositivo
+                        conn.enable()
+                        interfaces = conn.send_command_timing('show ip interface brief')
+                        routing_prots = conn.send_command_timing('show ip protocols')
+                        arp = conn.send_command_timing('show arp')
+                        cpu = conn.send_command_timing('show processes cpu history')
+                        power = conn.send_command_timing('show environment all')
+                        config = conn.send_command_timing('show running-config')
+
+                    # Agregar información del dispositivo al documento de Word
+                    doc.add_heading(f"Información de {hostname}", level=1)
+                    doc.add_paragraph(f"Interfaces:\n {interfaces}")
+                    doc.add_paragraph(f"Protocolos de Enrutamiento:\n {routing_prots}")
+                    doc.add_paragraph(f"Tabla ARP:\n {arp}")
+                    doc.add_paragraph(f"Uso de CPU:\n {cpu}")
+                    doc.add_paragraph(f"Estado de Energía:\n {power}")
+                    doc.add_paragraph(f"Configuración:\n {config}")
+
+                    print(f"[+] Información de {hostname} obtenida...")
+
+                except Exception as e:
+                    doc.add_paragraph(f"Error en {hostname}: {str(e)}")
+
+            # Guardar el documento de Word
+            doc.save(output_file)
+
+            print(f"Informe Word generado en {output_file}")
+
+        except Exception as e:
+            print(f"Error al generar el informe Word: {str(e)}")
+
 def main():
     auto_nms = AutoNMS()
     auto_nms.loadRoutersFromFile()
-    auto_nms.verifyFA()
+    auto_nms.generateReport("Informe_de_Red.docx")
 
     #auto_nms.getCiscoLogs()
     """
