@@ -1,7 +1,5 @@
 from netmiko import ConnectHandler
 from datetime import datetime
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
 import re, csv, os, json, threading, signal, sys, logging, socket, docx
 
 rojo = "\033[1;31m"
