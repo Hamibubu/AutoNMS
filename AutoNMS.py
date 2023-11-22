@@ -1,10 +1,12 @@
 from netmiko import ConnectHandler
 from datetime import datetime
-import re, csv, os, json
+import re, csv, os, json, threading, signal, sys, logging, socket
 
 class AutoNMS:
     def __init__(self):
         self.devices = []
+        self.server_socket = None
+        self.run = True
     
     def showIPAM(self):
         data = {}
@@ -201,7 +203,85 @@ class AutoNMS:
             print(f"Archivo no encontrado: {archivo}")
         return commands
     
+    def syslogListener(self):
 
-auto_nms = AutoNMS()
-auto_nms.loadRoutersFromFile()
-auto_nms.sendConfigSpecific()
+        high_severity = []
+        log_folder = "syslog"
+        log_file = os.path.join(log_folder, "syslog.log")
+        
+        os.makedirs(log_folder, exist_ok=True)
+        
+        logging.basicConfig(filename=log_file, level=logging.INFO, format='%(message)s')
+
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.server_socket.bind(("192.168.174.1", 514))
+        print(f"Servidor syslog escuchando en 192.168.174.1:{514}")
+
+        while self.run:
+            try:
+                data, addr = self.server_socket.recvfrom(1024)  # Tamaño del búfer
+                message = data.decode("utf-8")
+                print(f"[+] Mensaje de syslog recibido de {addr}: {message}")
+                logging.info(message)
+                if "ERROR" in message or "CRITICAL" in message:
+                    high_severity.append(message)
+                    print("[!] Evento de severidad alta detectado.")
+                    if "ERROR" in message or "CRITICAL" in message:
+                        high_severity.append(message)
+                        print("[!] Evento de severidad alta detectado.")
+            except OSError:
+                self.run=False
+                self.handleShutdown(high_severity)
+
+    def get_last_5_logs(self):
+        log_file = os.path.join("syslog", "syslog.log")
+        with open(log_file, 'r') as file:
+            lines = file.readlines()
+        last_5_logs = lines[-5:]
+        return last_5_logs
+
+    def handleShutdown(self, high_severity):
+        print("\nDeteniendo el servidor syslog...")
+        last5 = self.get_last_5_logs()
+        print(last5)
+        self.generate_csv(high_severity, "high_severity_logs.csv")
+        print("Archivo generado: high_severity_logs.csv")
+    
+    def generate_csv(self, logs, filename):
+        with open(filename, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['Log Message'])
+            for log in logs:
+                writer.writerow([log])
+
+    def stopSyslogListener(self):
+        self.should_run = False
+        if self.server_socket:
+            self.server_socket.close()
+        
+
+def main():
+    auto_nms = AutoNMS()
+    auto_nms.loadRoutersFromFile()
+
+    # Iniciar el hilo del servidor syslog
+    syslog_thread = threading.Thread(target=auto_nms.syslogListener)
+    syslog_thread.start()
+
+    try:
+        # Esperar a que el usuario presione Ctrl+C
+        while True:
+            pass
+    except KeyboardInterrupt:
+        print("Deteniendo el servidor syslog...")
+        auto_nms.stopSyslogListener()
+
+    # Esperar a que el hilo del servidor syslog termine
+    syslog_thread.join()
+    print("Servidor syslog detenido.")
+
+if __name__ == "__main__":
+    main()
+
+
+
