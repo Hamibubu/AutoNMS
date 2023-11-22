@@ -1,0 +1,42 @@
+[
+    {
+        "device_type": "cisco_ios_telnet",
+        "ip": "4.4.4.1",
+        "username": "netadmin",
+        "password": "Passw0rd",
+        "port": 23,
+        "secret": "Passw0rd"
+    },
+    {
+        "device_type": "cisco_ios_telnet",
+        "ip": "4.4.4.2",
+        "username": "netadmin",
+        "password": "Passw0rd",
+        "port": 23,
+        "secret": "Passw0rd"
+    },
+    {
+        "device_type": "cisco_ios_telnet",
+        "ip": "4.4.4.3",
+        "username": "netadmin",
+        "password": "Passw0rd",
+        "port": 23,
+        "secret": "Passw0rd"
+    },
+    {
+        "device_type": "cisco_ios_telnet",
+        "ip": "4.4.4.4",
+        "username": "netadmin",
+        "password": "Passw0rd",
+        "port": 23,
+        "secret": "Passw0rd"
+    },
+    {
+        "device_type": "cisco_ios_telnet",
+        "ip": "4.4.4.5",
+        "username": "netadmin",
+        "password": "Passw0rd",
+        "port": 23,
+        "secret": "Passw0rd"
+    }
+]

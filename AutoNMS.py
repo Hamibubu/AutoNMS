@@ -1,57 +1,10 @@
 from netmiko import ConnectHandler
 from datetime import datetime
-import re, csv, os
-
-R1 = {
-    'device_type': 'cisco_ios_telnet',
-    'ip': '4.4.4.1',
-    'username': 'netadmin',
-    'password': 'Passw0rd',
-    'port': 23,  # Telnet port
-    'secret': 'Passw0rd',
-}
-
-R2 = {
-    'device_type': 'cisco_ios_telnet',
-    'ip': '4.4.4.2',
-    'username': 'netadmin',
-    'password': 'Passw0rd',
-    'port': 23,  # Telnet port
-    'secret': 'Passw0rd',
-}
-
-R3 = {
-    'device_type': 'cisco_ios_telnet',
-    'ip': '4.4.4.3',
-    'username': 'netadmin',
-    'password': 'Passw0rd',
-    'port': 23,  # Telnet port
-    'secret': 'Passw0rd',
-}
-
-R4 = {
-    'device_type': 'cisco_ios_telnet',
-    'ip': '4.4.4.4',
-    'username': 'netadmin',
-    'password': 'Passw0rd',
-    'port': 23,  # Telnet port
-    'secret': 'Passw0rd',
-}
-
-R5 = {
-    'device_type': 'cisco_ios_telnet',
-    'ip': '4.4.4.5',
-    'username': 'netadmin',
-    'password': 'Passw0rd',
-    'port': 23,  # Telnet port
-    'secret': 'Passw0rd',
-}
-
-devices = [R1,R2,R3,R4,R5]
+import re, csv, os, json
 
 class AutoNMS:
-    def __init__(self, devices):
-        self.devices = devices
+    def __init__(self):
+        self.devices = []
     
     def showIPAM(self):
         data = {}
@@ -73,14 +26,14 @@ class AutoNMS:
                     }
 
                     # Imprimir la información
-                    print(f"Información para {hostname}:")
-                    print("Interfaces:")
+                    print(f"[i] Información para {hostname}:")
+                    print("[+]Interfaces:")
                     for interface, ip in interfaces_data.items():
-                        print(f"Interface: {interface}, IP: {ip}")
+                        print(f"[+] Interface: {interface}, IP: {ip}")
                     print("\n")
 
             except Exception as e:
-                print(f"Error en la conexión a {device['ip']}: {e}")
+                print(f"[!] Error en la conexión a {device['ip']}: {e}")
 
         return data
 
@@ -137,14 +90,14 @@ class AutoNMS:
                         # Guardar la configuración actual
                         with open(config_filename, 'w') as config_file:
                             config_file.write(config_output)
-                        print(f"Configuración de {hostname} ha cambiado y se ha guardado en {config_filename}")
+                        print(f"[i] Configuración de {hostname} ha cambiado y se ha guardado en {config_filename}")
                     else:
-                        print(f"Configuración de {hostname} no ha cambiado, no se guarda nada.")
+                        print(f"[i] Configuración de {hostname} no ha cambiado, no se guarda nada.")
                 else:
                     # No hay configuraciones anteriores, guardar la configuración actual
                     with open(config_filename, 'w') as config_file:
                         config_file.write(config_output)
-                    print(f"Configuración de {hostname} guardada en {config_filename}")
+                    print(f"[i] Configuración de {hostname} guardada en {config_filename}")
 
             except Exception as e:
                 print(f"Error en la conexión a {device['ip']}: {e}")
@@ -157,7 +110,7 @@ class AutoNMS:
                 if hostname_match:
                     return hostname_match.group(1)
         except Exception as e:
-            print(f"Error obteniendo el hostname de {device['ip']}: {e}")
+            print(f"[!] Error obteniendo el hostname de {device['ip']}: {e}")
         return "Unknown"
     
     def getLatestConfig(self, folder_path):
@@ -169,6 +122,86 @@ class AutoNMS:
         if config_files:
             return os.path.join(folder_path, max(config_files))
         return None
+    
+    def addRouter(self):
+        print("Agregar un nuevo router manualmente:")
+        device = {}
+        device['device_type'] = input("[+] Ingrese el tipo de dispositivo (e.g., cisco_ios_telnet): ")
+        device['ip'] = input("[+] Ingrese la dirección IP del dispositivo: ")
+        device['username'] = input("[+] Ingrese el nombre de usuario: ")
+        device['password'] = input("[+] Ingrese la contraseña: ")
+        device['port'] = int(input("[+] Ingrese el número de puerto (e.g., 23): "))
+        device['secret'] = input("[+] Ingrese la contraseña secreta (o presione Enter si no hay): ")
 
-auto_nms = AutoNMS(devices)
-auto_nms.confManager()
+        with open('routers.json', 'r') as file:
+            existing_devices = json.load(file)
+
+        existing_devices.append(device)
+
+        with open('routers.json', 'w') as file:
+            json.dump(existing_devices, file, indent=4)
+
+        self.devices = existing_devices
+
+    def loadRoutersFromFile(self, filename='routers.json'):
+        try:
+            with open(filename, 'r') as file:
+                self.devices = json.load(file)
+                print("[i] Routers cargados desde el archivo.")
+        except FileNotFoundError:
+            print("[!] El archivo de configuración de routers no existe.")
+
+    def sendConfigAll(self):
+        file = str(input("[+] Dame el nombre del archivo sobre el que leer: "))
+        commands = self.readCommands(file)
+        for device in self.devices:
+            try:
+                with ConnectHandler(**device) as conn:
+                    conn.enable()  
+                    output = conn.send_config_set(commands)
+                    output = output.split('\n')
+                    for line in output:
+                        if "^" in line:
+                            print("[!] Error en este comando: "+str(temp))
+                        temp = line
+            except Exception as e:
+                print(f"[!] Error en la conexión a {device['ip']}: {e}")
+
+    def sendConfigSpecific(self):
+        router_ip = str(input("[+] Dame la IP del router al que se mandará la información: "))
+        for device in self.devices:
+            if device.get('ip') == router_ip:
+                print(f"[+] Router encontrado: {device}")
+                file = str(input("[+] Dame el nombre del archivo sobre el que leer: "))
+                commands = self.readCommands(file)
+                try:
+                    with ConnectHandler(**device) as conn:
+                        conn.enable()  
+                        output = conn.send_config_set(commands)
+                        output = output.split('\n')
+                        for line in output:
+                            if "^" in line:
+                                print("[!] Error en este comando: "+str(temp))
+                            temp = line
+                except Exception as e:
+                    print(f"[!] Error en la conexión a {device['ip']}: {e}")
+                break
+        else:
+            print(f"[!] No se encontró un router con la IP {router_ip}")
+
+    def readCommands(self, archivo):
+        commands = []
+        try:
+            with open(archivo, 'r') as file:
+                lines = file.readlines()
+                for line in lines:
+                    comand = line.strip()
+                    commands.append(comand)
+        except FileNotFoundError:
+            print(f"Archivo no encontrado: {archivo}")
+        return commands
+    
+
+auto_nms = AutoNMS()
+auto_nms.loadRoutersFromFile()
+auto_nms.sendConfigSpecific()

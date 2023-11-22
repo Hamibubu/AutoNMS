@@ -1,0 +1,2 @@
+interface ethernet 1/0
+descriptdion AUTOMATED_DESCRIPTION
