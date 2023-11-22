@@ -4,6 +4,12 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import re, csv, os, json, threading, signal, sys, logging, socket, docx
 
+rojo = "\033[1;31m"
+verde = "\033[1;32m"
+amarillo = "\033[1;33m"
+azul = "\033[1;34m"
+reset = "\033[0;0m"
+
 class AutoNMS:
     def __init__(self):
         self.devices = []
@@ -56,6 +62,7 @@ class AutoNMS:
 
     def saveIPAM(self, filename='ipam.csv'):
         ipam_data = self.showIPAM()
+        print(ipam_data)
         with open(filename, 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['Hostname', 'Interface', 'IP Address'])
@@ -259,7 +266,7 @@ class AutoNMS:
 
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.server_socket.bind(("192.168.174.1", 514))
-        print(f"Servidor syslog escuchando en 192.168.174.1:{514}")
+        print(f"Servidor syslog escuchando en 192.168.174.1:{514} (Presiona CTRL+C para salir)")
 
         while self.run:
             try:
@@ -605,32 +612,47 @@ class AutoNMS:
         except Exception as e:
             print(f"Error al generar el informe Word: {str(e)}")
 
+def Menu():
+    print("[+] Selecciona lo que deseas:")
+    print(f"1.- Menú {verde}IPAM{reset}")
+    print(f"2.- Menú de {verde}change manager{reset}")
+    print(f"3.- Configuration {verde}Manager{reset}")
+    print(f"4.- Agregar {verde}ROUTER{reset}")
+    print(f"5.- Mostrar opciones de {verde}Syslog{reset}")
+    print(f"6.- Compliance {verde}Security{reset}")
+    print(f"7.- {verde}Generar Reporte{reset}")
+    print(f"8.- {rojo}Salir{reset}")
+    choice = int(input("Ingrese una opción: "))
+    return choice
+
 def main():
     auto_nms = AutoNMS()
     auto_nms.loadRoutersFromFile()
-    auto_nms.generateReport("Informe_de_Red.docx")
-
-    #auto_nms.getCiscoLogs()
-    """
-    # Iniciar el hilo del servidor syslog
-    syslog_thread = threading.Thread(target=auto_nms.syslogListener)
-    syslog_thread.start()
-
-    try:
-        # Esperar a que el usuario presione Ctrl+C
-        while True:
-            pass
-    except KeyboardInterrupt:
-        print("Deteniendo el servidor syslog...")
-        auto_nms.stopSyslogListener()
-
-    # Esperar a que el hilo del servidor syslog termine
-    syslog_thread.join()
-    print("Servidor syslog detenido.")
-    """
+    while True:
+        choice = Menu()
+        if choice == 1:
+            auto_nms.menuIPAM()
+        elif choice == 2:
+            auto_nms.confMenu()
+        elif choice == 3:
+            auto_nms.confManager()
+        elif choice == 4:
+            auto_nms.addRouter()
+        elif choice == 5:
+            auto_nms.showOptionsSyslog()
+        elif choice == 6:
+            auto_nms.complianceSecurity()
+        elif choice == 7:
+            nombre_arch = str(input("[?] ¿Qué nombre le quieres dar al archivo?\n   > "))
+            auto_nms.generateReport()
+        elif choice == 8:
+            confirmacion = input("¿Está seguro de que desea salir? (Si/No): ").lower()
+            if confirmacion == "si":
+                exit()
+            else:
+                print("Continuando...")
+        else:
+            print(f"{rojo}Opción inválida{reset}")
 
 if __name__ == "__main__":
     main()
-
-
-
