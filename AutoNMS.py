@@ -300,10 +300,174 @@ class AutoNMS:
             except Exception as e:
                 print(f"Error en la conexión a {device['ip']}: {e}")
 
+    def complianceSecurity(self):
+        print("[+] Que quieres verificar: ")
+        print("1. Checar si hay protocolos de ruteo no autorizados: ")
+        print("2. Checar si hay ")
+
+        
+    def checkRouting(self):
+        contin = True
+        protocolos = []
+        while contin:
+            protocolo_auth = str(input("[+] Introduce el protocolo o los protocolos de ruteo autorizados: ")).lower()
+            protocolos.append(protocolo_auth)
+            seguir = str(input("[!] Quieres agregar otro? (si - no): "))
+            seguir = seguir.lower()
+            if (seguir != "si"):
+                print("[+] Revisando...")
+                contin = False
+        for device in self.devices:
+            try:
+                # Obtener el hostname del dispositivo
+                hostname = self.get_hostname(device)
+
+                with ConnectHandler(**device) as conn:
+                    # Obtener la configuración del dispositivo y guardarla en un archivo
+                    conn.enable()
+                    output = conn.send_command_timing('show ip protocols')
+
+                patron = r'Routing Protocol is "([^"]*)"'
+
+                resultados = re.findall(patron, str(output))
+
+                if resultados:
+                    for resultado in resultados:
+                        partes = resultado.split(' ')
+                        if len(partes) == 2:
+                            protocolo, numero = partes
+                        if protocolo not in protocolo_auth:
+                            print(f"[+] Protocolo no autorizado encontrado {resultado} en {hostname}")
+                            option = str(input("[+] ¿Deseas eliminarlo? (si - no): ")).lower()
+                            if option != "no":
+                                print(f"[+] Eliminando {resultado} en {hostname}...")
+                                comando = ["no router "+resultado,"end","wr"]
+                                try:
+                                    with ConnectHandler(**device) as conn:
+                                        conn.enable()  
+                                        output = conn.send_config_set(comando)
+                                        print(output)
+                                        output = output.split('\n')
+                                        for line in output:
+                                            if "^" in line:
+                                                print("[!] Error en este comando: "+str(temp))
+                                            temp = line
+                                        
+                                except Exception as e:
+                                    print(f"[!] Error en la conexión a {device['ip']}: {e}")
+                                break
+                    print(f"[+] Chequeo terminado parece estar todo bien en {hostname}...")                
+                else:
+                    print(f"[+] No hay protocolos de ruteo en {hostname}")
+
+            except Exception as e:
+                print(f"Error en la conexión a {device['ip']}: {e}")
+
+    def checkSSH(self):
+        for device in self.devices:
+            try:
+                # Obtener el hostname del dispositivo
+                hostname = self.get_hostname(device)
+
+                with ConnectHandler(**device) as conn:
+                    # Obtener la configuración del dispositivo y guardarla en un archivo
+                    conn.enable()
+                    output = conn.send_command_timing('show ip ssh')
+
+                # Regex para extraer la versión de SSH
+                version_ssh_regex = r"SSH Enabled - version (\d+\.\d+)"
+                version_ssh = re.search(version_ssh_regex, output)
+                if version_ssh:
+                    version_ssh = version_ssh.group(1)
+
+                # Regex para extraer el tamaño mínimo de la clave Diffie Hellman
+                dh_size_regex = r"Minimum expected Diffie Hellman key size : (\d+) bits"
+                dh_size = re.search(dh_size_regex, output)
+                if dh_size:
+                    dh_size = dh_size.group(1)
+
+                print(f"Versión SSH: {version_ssh}")
+                print(f"Tamaño de clave Diffie Hellman: {dh_size} bits")
+
+                if int(dh_size) < 2048:
+                    print(f"[+] Tamaño de bits inseguro {dh_size} bits, se recomienda user 2048 bits")
+                    change = str(input("[+] ¿Deseas cambiar el tamaño?: ")).lower()
+                    if change != "no":
+                        print(f"[+] Agregando el requisito de 2048 bits en {hostname}...")
+                        comando = ["ip ssh dh min size 2048","end","wr"]
+                        try:
+                            with ConnectHandler(**device) as conn:
+                                conn.enable()  
+                                output = conn.send_config_set(comando)
+                                print(output)
+                                output = output.split('\n')
+                                for line in output:
+                                    if "^" in line:
+                                        print("[!] Error en este comando: "+str(temp))
+                                    temp = line
+                        except Exception as e:
+                            print(f"[!] Error en la conexión a {device['ip']}: {e}")
+                if str(version_ssh) != "2.0":
+                    print(f"[+] Versión de ssh no es segura...")
+                    change = str(input("[+] ¿Deseas cambiarla?: ")).lower()
+                    if change != "no":
+                        print(f"[+] Agregando ssh version 2 {hostname}...")
+                        comando = ["ip ssh version 2","end","wr"]
+                        try:
+                            with ConnectHandler(**device) as conn:
+                                conn.enable()  
+                                output = conn.send_config_set(comando)
+                                print(output)
+                                output = output.split('\n')
+                                for line in output:
+                                    if "^" in line:
+                                        print("[!] Error en este comando: "+str(temp))
+                                    temp = line
+                        except Exception as e:
+                            print(f"[!] Error en la conexión a {device['ip']}: {e}")
+                print(f"[+] Chequeo terminado parece estar todo bien en {hostname}...")                
+            except Exception as e:
+                print(f"Error en la conexión a {device['ip']}: {e}")
+        
+    def verifyFA(self):
+        contin = True
+        for device in self.devices:
+            try:
+                # Obtener el hostname del dispositivo
+                hostname = self.get_hostname(device)
+
+                with ConnectHandler(**device) as conn:
+                    # Obtener la configuración del dispositivo y guardarla en un archivo
+                    conn.enable()
+                    output = conn.send_command_timing('show ip ssh')
+
+                if "down" not in output:
+                    print(f"[!] La interface de Fa0/0 parece estar activa en {hostname} ...") 
+                    change = str(input("[+] ¿Deseas apagarla?: ")).lower()
+                    if change != "no":
+                        print(f"[+] Agregando Fa0/0 en {hostname}...")
+                        comandos = ["interface FastEthernet0/0","shutdown","end","wr"]
+                    try:
+                        with ConnectHandler(**device) as conn:
+                            conn.enable()  
+                            output = conn.send_config_set(comandos)
+                            print(output)
+                            output = output.split('\n')
+                            for line in output:
+                                if "^" in line:
+                                    print("[!] Error en este comando: "+str(temp))
+                                temp = line
+                    except Exception as e:
+                        print(f"[!] Error en la conexión a {device['ip']}: {e}")
+            except Exception as e:
+                print(f"Error en la conexión a {device['ip']}: {e}")
+
 def main():
     auto_nms = AutoNMS()
     auto_nms.loadRoutersFromFile()
-    auto_nms.getCiscoLogs()
+    auto_nms.verifyFA()
+
+    #auto_nms.getCiscoLogs()
     """
     # Iniciar el hilo del servidor syslog
     syslog_thread = threading.Thread(target=auto_nms.syslogListener)
