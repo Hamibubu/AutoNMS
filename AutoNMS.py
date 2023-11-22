@@ -223,12 +223,9 @@ class AutoNMS:
                 message = data.decode("utf-8")
                 print(f"[+] Mensaje de syslog recibido de {addr}: {message}")
                 logging.info(message)
-                if "ERROR" in message or "CRITICAL" in message:
+                if self.is_critical_error(message):
                     high_severity.append(message)
                     print("[!] Evento de severidad alta detectado.")
-                    if "ERROR" in message or "CRITICAL" in message:
-                        high_severity.append(message)
-                        print("[!] Evento de severidad alta detectado.")
             except OSError:
                 self.run=False
                 self.handleShutdown(high_severity)
@@ -258,12 +255,56 @@ class AutoNMS:
         self.should_run = False
         if self.server_socket:
             self.server_socket.close()
-        
+
+    def is_critical_error(self, message):
+        # Revisa si el mensaje contiene indicadores de error crítico
+        critical_keywords = ["CRITICAL", "ERROR", "ALERT", "EMERGENCY", "FAILED", "UPDOWN"]
+        severity_levels = ["%0-", "%1-", "%2-"]
+        return any(keyword in message for keyword in critical_keywords) or any(message.startswith(level) for level in severity_levels)    
+
+    def getCiscoLogs(self):
+        high_severity = []
+        for device in self.devices:
+            try:
+                # Obtener el hostname del dispositivo
+                hostname = self.get_hostname(device)
+
+                # Crear una carpeta con el nombre del hostname si no existe
+                folder_path = f"syslog/{hostname}"
+                os.makedirs(folder_path, exist_ok=True)
+
+                with ConnectHandler(**device) as conn:
+                    # Obtener la configuración del dispositivo y guardarla en un archivo
+                    conn.enable()
+                    syslog_output = conn.send_command_timing('show logging')
+
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                syslog_filename = f"{folder_path}/syslog_{timestamp}.txt"
+
+                with open(syslog_filename, 'w') as syslog_file:
+                    syslog_file.write(syslog_output)
+                print(f"[i] Configuración de {hostname} guardada en {syslog_filename}")
+                # Verificar si hay errores críticos en los logs
+                for log_line in syslog_output.splitlines():
+                    if self.is_critical_error(log_line):
+                        print(f"Error crítico encontrado en {hostname}: {log_line}")
+                        high_severity.append(str(hostname)+str(log_line))
+                
+                print("[i] Últimos 5 logs")
+
+                for error in syslog_output.splitlines()[-5:]:
+                    print(error)
+
+                self.generate_csv(high_severity, "high_severity_logs.csv")
+
+            except Exception as e:
+                print(f"Error en la conexión a {device['ip']}: {e}")
 
 def main():
     auto_nms = AutoNMS()
     auto_nms.loadRoutersFromFile()
-
+    auto_nms.getCiscoLogs()
+    """
     # Iniciar el hilo del servidor syslog
     syslog_thread = threading.Thread(target=auto_nms.syslogListener)
     syslog_thread.start()
@@ -279,6 +320,7 @@ def main():
     # Esperar a que el hilo del servidor syslog termine
     syslog_thread.join()
     print("Servidor syslog detenido.")
+    """
 
 if __name__ == "__main__":
     main()
