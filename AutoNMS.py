@@ -64,6 +64,25 @@ class AutoNMS:
                 for interface, ip in interfaces_data.items():
                     writer.writerow([hostname, interface, ip])
 
+    def menuIPAM(self):
+        while True:
+            print("[+] Menú de IPAM:")
+            print("1. Mostrar solamente el IPAM.")
+            print("2. Guardar los datos.")
+            print("3. Salir.")
+
+            opcion = input("Selecciona una opción (1/2/3) > ")
+
+            if opcion == '1':
+                self.showIPAM()
+            elif opcion == '2':
+                self.saveIPAM()
+            elif opcion == '3':
+                print("Saliendo del menú de IPAM.")
+                break
+            else:
+                print("Opción no válida. Por favor, selecciona una opción válida.")
+
     def confManager(self):
         for device in self.devices:
             try:
@@ -131,6 +150,9 @@ class AutoNMS:
         print("Agregar un nuevo router manualmente:")
         device = {}
         device['device_type'] = input("[+] Ingrese el tipo de dispositivo (e.g., cisco_ios_telnet): ")
+        if device['device_type'] != "cisco_ios_telnet":
+            print("Tipo de dispositivo no válido. Se establecerá 'unknown' como tipo de dispositivo.")
+            device['device_type'] = "unknown"
         device['ip'] = input("[+] Ingrese la dirección IP del dispositivo: ")
         device['username'] = input("[+] Ingrese el nombre de usuario: ")
         device['password'] = input("[+] Ingrese la contraseña: ")
@@ -154,6 +176,26 @@ class AutoNMS:
                 print("[i] Routers cargados desde el archivo.")
         except FileNotFoundError:
             print("[!] El archivo de configuración de routers no existe.")
+
+    def confMenu(self):
+        while True:
+            print("[+] Menú de Configuración:")
+            print("1. Configuración específica.")
+            print("2. Configuración para todos los routers.")
+            print("3. Salir.")
+
+            opcion = input("Selecciona una opción (1/2/3) > ")
+
+            if opcion == '1':
+                self.sendConfigSpecific()
+            elif opcion == '2':
+                self.sendConfigAll()
+            elif opcion == '3':
+                print("Saliendo del menú de Configuración.")
+                break
+            else:
+                print("Opción no válida. Por favor, selecciona una opción válida.")
+
 
     def sendConfigAll(self):
         file = str(input("[+] Dame el nombre del archivo sobre el que leer: "))
@@ -258,6 +300,40 @@ class AutoNMS:
         if self.server_socket:
             self.server_socket.close()
 
+    def showOptionsSyslog(self):
+        while True:
+            print("[+] Menú de Syslog:")
+            print("1. Iniciar Syslog Listener.")
+            print("2. Obtener logs del router.")
+            print("3. Salir.")
+
+            opcion = input("Selecciona una opción (1/2/3) > ")
+
+            if opcion == '1':
+                syslog_thread = threading.Thread(target=self.syslogListener)
+                syslog_thread.start()
+
+                try:
+                    # Esperar a que el usuario presione Ctrl+C
+                    while True:
+                        pass
+                except KeyboardInterrupt:
+                    print("Deteniendo el servidor syslog...")
+                    self.stopSyslogListener()
+
+                # Esperar a que el hilo del servidor syslog termine
+                syslog_thread.join()
+                print("Servidor syslog detenido.")
+                
+            elif opcion == '2':
+                self.getCiscoLogs()
+
+            elif opcion == '3':
+                print("Saliendo del menú de Syslog.")
+                break
+            else:
+                print("Opción no válida. Por favor, selecciona una opción válida.")
+
     def is_critical_error(self, message):
         # Revisa si el mensaje contiene indicadores de error crítico
         critical_keywords = ["CRITICAL", "ERROR", "ALERT", "EMERGENCY", "FAILED", "UPDOWN"]
@@ -303,9 +379,25 @@ class AutoNMS:
                 print(f"Error en la conexión a {device['ip']}: {e}")
 
     def complianceSecurity(self):
-        print("[+] Que quieres verificar: ")
-        print("1. Checar si hay protocolos de ruteo no autorizados: ")
-        print("2. Checar si hay ")
+        while True:
+            print("[+] ¿Qué quieres verificar?:")
+            print("1. Checar si hay protocolos de ruteo no autorizados.")
+            print("2. Checar seguridad del ssh.")
+            print("3. Checar si Fa 0/0 está apagada.")
+            print("4. Salir")
+
+            opcion = input("Selecciona una opción (1/2/3/4) >  ")
+
+            if opcion == '1':
+                self.checkRouting()
+            elif opcion == '2':
+                self.checkSSH()
+            elif opcion == '3':
+                self.verifyFA()
+            elif opcion == '4':
+                break
+            else:
+                print("Opción no válida. Por favor, selecciona una opción válida.")
 
         
     def checkRouting(self):
