@@ -1,6 +1,6 @@
 from netmiko import ConnectHandler
 from datetime import datetime
-import re, csv, os, json, threading, signal, sys, logging, socket, docx
+import re, csv, os, json, threading, logging, socket, docx
 
 rojo = "\033[1;31m"
 verde = "\033[1;32m"
@@ -341,7 +341,7 @@ class AutoNMS:
 
     def is_critical_error(self, message):
         # Revisa si el mensaje contiene indicadores de error crítico
-        critical_keywords = ["CRITICAL", "ERROR", "ALERT", "EMERGENCY", "FAILED", "UPDOWN"]
+        critical_keywords = ["CRITICAL", "ERROR", "ALERT", "EMERGENCY", "FAILED", " %LINEPROTO-5-UPDOWN"]
         severity_levels = ["%0-", "%1-", "%2-"]
         return any(keyword in message for keyword in critical_keywords) or any(message.startswith(level) for level in severity_levels)    
 
@@ -642,7 +642,7 @@ def main():
             auto_nms.complianceSecurity()
         elif choice == 7:
             nombre_arch = str(input("[?] ¿Qué nombre le quieres dar al archivo?\n   > "))
-            auto_nms.generateReport()
+            auto_nms.generateReport(nombre_arch)
         elif choice == 8:
             confirmacion = input("¿Está seguro de que desea salir? (Si/No): ").lower()
             if confirmacion == "si":
